@@ -1,0 +1,11 @@
+
+/* الأساسيات يتم معالجتها عبر Tailwind في index.html */
+:root {
+  --app-bg: #f8fafc;
+}
+
+body {
+  background-color: var(--app-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

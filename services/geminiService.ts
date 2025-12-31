@@ -1,22 +1,17 @@
 
 import { GoogleGenAI } from "@google/genai";
 
-// دالة مساعدة للتهيئة الآمنة
-const getAiClient = () => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey || apiKey === "REQUIRED_API_KEY_MISSING") {
-    return null;
-  }
-  return new GoogleGenAI({ apiKey });
-};
-
 export const generateStudentReport = async (studentName: string, attendanceData: any, performanceData: any) => {
   try {
-    const ai = getAiClient();
+    // الوصول للمفتاح بطريقة آمنة لا يتم استبدالها أثناء البناء (Build)
+    const apiKey = (window as any).process?.env?.API_KEY;
     
-    if (!ai) {
-      return "تنبيه: لم يتم ضبط مفتاح Gemini API في إعدادات الخادم. يرجى من المسؤول إضافة API_KEY لتمكين التقارير الذكية.";
+    if (!apiKey || apiKey === "REQUIRED_API_KEY_MISSING" || apiKey.length < 10) {
+      return "تنبيه: لم يتم العثور على مفتاح Gemini API صالح في إعدادات النظام. يرجى إضافة API_KEY في لوحة تحكم Vercel لتمكين هذه الخاصية.";
     }
+
+    // لا نقوم بإنشاء العميل إلا عند استدعاء الدالة فعلياً
+    const ai = new GoogleGenAI({ apiKey });
 
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
@@ -30,10 +25,10 @@ export const generateStudentReport = async (studentName: string, attendanceData:
 
     return response.text || "لم يتمكن الذكاء الاصطناعي من توليد نص حالياً.";
   } catch (error: any) {
-    console.error("Error generating report:", error);
-    if (error.message?.includes('API_KEY')) {
-      return "خطأ: مفتاح API الخاص بـ Gemini غير صالح أو مفقود.";
+    console.error("Gemini Service Error:", error);
+    if (error.message?.includes('API Key') || error.message?.includes('API_KEY')) {
+      return "خطأ: مفتاح API الخاص بـ Gemini غير صحيح أو لم يتم إعداده في Vercel بشكل سليم.";
     }
-    return "عذراً، تعذر إنشاء التقرير في الوقت الحالي بسبب مشكلة في الاتصال بالذكاء الاصطناعي.";
+    return "عذراً، حدثت مشكلة أثناء محاولة إنشاء التقرير الذكي.";
   }
 };
