@@ -20,23 +20,33 @@ const App: React.FC = () => {
   useEffect(() => {
     // التحقق من الجلسة الحالية عند تشغيل التطبيق
     const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session?.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          // جلب بيانات البروفايل
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .maybeSingle();
 
-        setUser({
-          id: session.user.id,
-          name: profile?.full_name || session.user.email?.split('@')[0] || 'مستخدم',
-          email: session.user.email || '',
-          role: (profile?.role as Role) || 'TEACHER'
-        });
+          // استخدام البيانات الوصفية كاحتياط
+          const finalName = profile?.full_name || session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'مستخدم';
+          const finalRole = (profile?.role as Role) || (session.user.user_metadata?.role as Role) || 'TEACHER';
+
+          setUser({
+            id: session.user.id,
+            name: finalName,
+            email: session.user.email || '',
+            role: finalRole
+          });
+        }
+      } catch (err) {
+        console.error("Initialization error:", err);
+      } finally {
+        setInitializing(false);
       }
-      setInitializing(false);
     };
 
     checkUser();
@@ -45,11 +55,22 @@ const App: React.FC = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!session) {
         setUser(null);
+      } else if (session.user && !user) {
+        // إذا حدث تغيير في الحالة ولم يكن المستخدم مسجلاً في الـ state
+        const finalName = session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'مستخدم';
+        const finalRole = (session.user.user_metadata?.role as Role) || 'TEACHER';
+        
+        setUser({
+          id: session.user.id,
+          name: finalName,
+          email: session.user.email || '',
+          role: finalRole
+        });
       }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [user]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
