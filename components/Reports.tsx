@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Student } from '../types';
 import { supabase } from '../services/supabaseClient';
 import { generateStudentReport } from '../services/geminiService';
-import { MessageSquare, Send, Search, FileText, Loader2, AlertTriangle } from 'lucide-react';
+import { MessageSquare, Send, Search, FileText, Loader2 } from 'lucide-react';
 
 const Reports: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
@@ -12,15 +12,10 @@ const Reports: React.FC = () => {
   const [fetching, setFetching] = useState(true);
   const [report, setReport] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [keyError, setKeyError] = useState(false);
 
   useEffect(() => {
     fetchStudents();
-    // فحص أولي للمفتاح
-    const key = (window as any).process?.env?.API_KEY;
-    if (!key || key === "REQUIRED_API_KEY_MISSING") {
-      setKeyError(true);
-    }
+    // Removed direct API_KEY checks as the application must not manage or request keys from the user
   }, []);
 
   const fetchStudents = async () => {
@@ -63,13 +58,7 @@ const Reports: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {keyError && (
-        <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-center gap-3 text-amber-700 text-sm">
-          <AlertTriangle size={18} />
-          <span>تنبيه: ميزة التقارير الذكية تتطلب ضبط API_KEY في إعدادات Vercel.</span>
-        </div>
-      )}
-
+      {/* Removed keyError alert as per guidelines to not ask for or configure API keys in UI */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">

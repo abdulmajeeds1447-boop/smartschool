@@ -2,104 +2,91 @@
 import React, { useState } from 'react';
 import { User, Role } from '../types';
 import { supabase } from '../services/supabaseClient';
-import { Lock, Mail, ShieldCheck, GraduationCap, Loader2, UserPlus, Info, Send } from 'lucide-react';
+import { Lock, Fingerprint, ShieldCheck, GraduationCap, Loader2, Info, Mail } from 'lucide-react';
 
 interface LoginProps {
   onLogin: (user: User) => void;
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState(''); // يمكن أن يكون سجل مدني أو بريد
   const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [role, setRole] = useState<Role>('TEACHER');
   const [loading, setLoading] = useState(false);
-  const [resending, setResending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-
-  const handleResendLink = async () => {
-    if (!email) {
-      setError('يرجى إدخال البريد الإلكتروني أولاً لإعادة إرسال الرابط.');
-      return;
-    }
-    setResending(true);
-    setError(null);
-    try {
-      const { error: resendError } = await supabase.auth.resend({
-        type: 'signup',
-        email: email,
-      });
-      if (resendError) throw resendError;
-      setSuccess('تم إرسال رابط تفعيل جديد إلى بريدك الإلكتروني بنجاح.');
-    } catch (err: any) {
-      setError('فشل إرسال الرابط: ' + (err.message || 'حاول مرة أخرى لاحقاً'));
-    } finally {
-      setResending(false);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setSuccess(null);
+
+    const isEmail = identifier.includes('@');
+    const adminEmail = "abdulmajeed.s1447@gmail.com";
 
     try {
-      if (isSignUp) {
-        const { data, error: signUpError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: fullName,
-              role: role
-            }
-          }
-        });
+      let emailToAuth = identifier.trim();
+      let displayName = '';
+      let userRole: Role = 'TEACHER';
+
+      if (isEmail) {
+        // --- مسار دخول الإدارة (بالبريد) ---
+        emailToAuth = identifier.toLowerCase().trim();
         
-        if (signUpError) throw signUpError;
+        // جلب بيانات البروفايل للتأكد من الاسم والرتبة
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name, role')
+          .eq('email', emailToAuth)
+          .maybeSingle();
         
-        if (data.user && data.session === null) {
-          setSuccess('تم إنشاء الحساب! يرجى التحقق من بريدك الإلكتروني (Inbox/Spam) لتفعيل الحساب.');
-        } else {
-          setSuccess('تم إنشاء الحساب بنجاح! يمكنك الآن تسجيل الدخول.');
-        }
-        setIsSignUp(false);
+        displayName = profile?.full_name || (emailToAuth === adminEmail ? 'مدير النظام' : 'مستخدم');
+        userRole = (profile?.role as Role) || (emailToAuth === adminEmail ? 'ADMIN' : 'TEACHER');
       } else {
-        const { data, error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password
-        });
+        // --- مسار دخول المعلمين (بالسجل المدني) ---
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('email, role, full_name, id')
+          .eq('teacher_number', identifier.trim())
+          .maybeSingle();
+
+        if (profileError) throw profileError;
         
-        if (signInError) {
-          if (signInError.message === 'Invalid login credentials') {
-            throw new Error('خطأ في البريد الإلكتروني أو كلمة المرور. تأكد من صحة البيانات.');
-          } else if (signInError.message.toLowerCase().includes('email not confirmed')) {
-            setError('هذا الحساب لم يتم تفعيله بعد. يرجى مراجعة بريدك الإلكتروني.');
-            return; // نتوقف هنا لعرض خيار إعادة الإرسال
-          }
-          throw signInError;
+        if (!profile) {
+          throw new Error('السجل المدني غير مسجل في النظام. يرجى مراجعة الإدارة.');
         }
 
-        if (data.user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', data.user.id)
-            .maybeSingle();
+        emailToAuth = profile.email;
+        displayName = profile.full_name;
+        userRole = profile.role as Role;
+      }
 
-          const finalName = profile?.full_name || data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'مستخدم';
-          const finalRole = (profile?.role as Role) || (data.user.user_metadata?.role as Role) || 'TEACHER';
+      // إتمام عملية تسجيل الدخول عبر Supabase Auth
+      // للمدير: يجب إدخال كلمة المرور. للمعلم: السجل المدني هو كلمة المرور الافتراضية إذا لم تحدد
+      const finalPassword = password || (isEmail ? '' : identifier.trim());
+      
+      if (isEmail && !password) {
+        throw new Error('يرجى إدخال كلمة المرور الخاصة بحساب الإدارة.');
+      }
 
-          onLogin({
-            id: data.user.id,
-            name: finalName,
-            email: data.user.email || '',
-            role: finalRole
-          });
+      const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: emailToAuth,
+        password: finalPassword
+      });
+
+      if (signInError) {
+        if (signInError.message.includes('Invalid login credentials')) {
+          throw new Error(isEmail ? 'كلمة مرور الإدارة غير صحيحة.' : 'كلمة المرور غير صحيحة لهذا السجل المدني.');
         }
+        throw signInError;
+      }
+
+      if (authData.user) {
+        onLogin({
+          id: authData.user.id,
+          name: displayName,
+          email: authData.user.email || '',
+          role: userRole,
+          teacherNumber: isEmail ? undefined : identifier
+        });
       }
     } catch (err: any) {
       setError(err.message || 'حدث خطأ غير متوقع');
@@ -109,103 +96,52 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-[#0f172a] p-4 font-['Tajawal']">
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-500">
-          <div className="bg-blue-600 p-10 text-center text-white relative">
-            <div className="w-16 h-16 bg-white/20 rounded-2xl mx-auto flex items-center justify-center mb-4">
-              <GraduationCap size={40} className="text-white" />
+        <div className="bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-500">
+          {/* Header */}
+          <div className="bg-gradient-to-br from-indigo-600 to-blue-700 p-10 text-center text-white relative">
+            <div className="absolute top-4 right-4 opacity-10">
+              <ShieldCheck size={80} />
             </div>
-            <h1 className="text-2xl font-bold">مدرسة المستقبل الثانوية</h1>
-            <p className="text-blue-100 mt-2">{isSignUp ? 'إنشاء حساب نظام جديد' : 'نظام الإدارة المدرسية الموحد'}</p>
+            <div className="w-20 h-20 bg-white/20 rounded-3xl mx-auto flex items-center justify-center mb-6 backdrop-blur-md border border-white/30">
+              <GraduationCap size={44} className="text-white" />
+            </div>
+            <h1 className="text-2xl font-black tracking-tight">نظام مدرسة المستقبل</h1>
+            <p className="text-indigo-100 mt-2 text-sm font-medium opacity-90">بوابة الدخول الموحدة (إدارة / معلمين)</p>
           </div>
           
-          <form onSubmit={handleSubmit} className="p-8 space-y-6">
+          <form onSubmit={handleSubmit} className="p-8 space-y-5">
             {error && (
-              <div className="p-4 bg-rose-50 border border-rose-100 text-rose-600 text-sm rounded-xl font-medium flex flex-col gap-3">
-                <div className="flex items-start gap-3">
-                  <Info size={18} className="shrink-0 mt-0.5" />
-                  <span>{error}</span>
-                </div>
-                {error.includes('لم يتم تفعيله') && (
-                  <button 
-                    type="button"
-                    onClick={handleResendLink}
-                    disabled={resending}
-                    className="flex items-center gap-2 text-xs bg-rose-600 text-white px-3 py-2 rounded-lg hover:bg-rose-700 transition-all self-end disabled:opacity-50"
-                  >
-                    {resending ? <Loader2 className="animate-spin" size={12} /> : <Send size={12} />}
-                    إرسال رابط جديد الآن
-                  </button>
-                )}
+              <div className="p-4 bg-rose-50 border border-rose-100 text-rose-600 text-xs rounded-2xl font-bold flex items-start gap-3 animate-pulse">
+                <Info size={16} className="shrink-0 mt-0.5" />
+                <span>{error}</span>
               </div>
             )}
-
-            {success && (
-              <div className="p-4 bg-emerald-50 border border-emerald-100 text-emerald-700 text-sm rounded-xl font-medium flex items-start gap-3">
-                <CheckCircleIcon size={18} className="shrink-0 mt-0.5" />
-                <span>{success}</span>
-              </div>
-            )}
-
-            <div className="flex bg-slate-100 p-1 rounded-xl">
-              <button
-                type="button"
-                onClick={() => setRole('TEACHER')}
-                className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${role === 'TEACHER' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}
-              >
-                معلم
-              </button>
-              <button
-                type="button"
-                onClick={() => setRole('ADMIN')}
-                className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${role === 'ADMIN' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}
-              >
-                إدارة
-              </button>
-              <button
-                type="button"
-                onClick={() => setRole('PARENT')}
-                className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${role === 'PARENT' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}
-              >
-                ولي أمر
-              </button>
-            </div>
 
             <div className="space-y-4">
-              {isSignUp && (
-                <div className="relative">
-                  <UserPlus className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input
-                    type="text"
-                    placeholder="الاسم الكامل"
-                    className="w-full pr-12 pl-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all text-right"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    required={isSignUp}
-                  />
+              <div className="relative group">
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors">
+                  {identifier.includes('@') ? <Mail size={20} /> : <Fingerprint size={20} />}
                 </div>
-              )}
-              <div className="relative">
-                <Mail className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                 <input
-                  type="email"
-                  placeholder="البريد الإلكتروني"
-                  className="w-full pr-12 pl-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all text-right"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  type="text"
+                  placeholder="السجل المدني أو البريد الإلكتروني"
+                  className="w-full pr-12 pl-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:bg-white transition-all text-right font-bold text-slate-700"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
                   required
                 />
               </div>
-              <div className="relative">
-                <Lock className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              
+              <div className="relative group">
+                <Lock className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" size={20} />
                 <input
                   type="password"
                   placeholder="كلمة المرور"
-                  className="w-full pr-12 pl-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all text-right"
+                  className="w-full pr-12 pl-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:bg-white transition-all text-right font-bold text-slate-700"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  required
                 />
               </div>
             </div>
@@ -213,38 +149,28 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-lg hover:bg-indigo-700 active:scale-[0.98] transition-all shadow-xl shadow-indigo-500/30 flex items-center justify-center gap-3 disabled:opacity-50"
             >
-              {loading ? <Loader2 className="animate-spin" size={20} /> : <ShieldCheck size={20} />}
-              {isSignUp ? 'إنشاء الحساب' : 'تسجيل الدخول'}
+              {loading ? <Loader2 className="animate-spin" size={24} /> : <ShieldCheck size={24} />}
+              {identifier.includes('@') ? 'دخول الإدارة' : 'دخول المعلمين'}
             </button>
 
-            <div className="text-center">
-              <button 
-                type="button"
-                onClick={() => {
-                  setIsSignUp(!isSignUp);
-                  setError(null);
-                  setSuccess(null);
-                }}
-                className="text-sm text-blue-600 font-bold hover:underline"
-              >
-                {isSignUp ? 'لديك حساب بالفعل؟ سجل دخولك' : 'ليس لديك حساب؟ اضغط هنا للتسجيل'}
-              </button>
+            <div className="pt-6 text-center border-t border-slate-50">
+              <div className="flex justify-center gap-4 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                <span className="flex items-center gap-1"><ShieldCheck size={12} className="text-emerald-500" /> مشفر</span>
+                <span className="flex items-center gap-1"><ShieldCheck size={12} className="text-emerald-500" /> آمن</span>
+                <span className="flex items-center gap-1"><ShieldCheck size={12} className="text-emerald-500" /> سحابي</span>
+              </div>
             </div>
           </form>
         </div>
+        
+        <p className="text-center mt-8 text-slate-500 text-xs font-medium">
+          الدعم الفني: abdulmajeed.s1447@gmail.com
+        </p>
       </div>
     </div>
   );
 };
-
-// مكون أيقونة النجاح المفقود
-const CheckCircleIcon = ({ size, className }: { size: number, className?: string }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-    <polyline points="22 4 12 14.01 9 11.01"></polyline>
-  </svg>
-);
 
 export default Login;

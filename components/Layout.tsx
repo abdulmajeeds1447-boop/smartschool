@@ -10,7 +10,9 @@ import {
   BarChart3, 
   LogOut,
   Bell,
-  UserCircle
+  UserCircle,
+  Settings,
+  ShieldAlert
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -29,6 +31,7 @@ const Layout: React.FC<LayoutProps> = ({ user, onLogout, activeTab, setActiveTab
     { id: 'attendance', label: 'الحضور والغياب', icon: ClipboardCheck, roles: ['TEACHER', 'ATTENDANCE_OFFICER', 'ADMIN'] as Role[] },
     { id: 'assignments', label: 'الواجبات والمشاركة', icon: BookOpen, roles: ['TEACHER', 'PARENT', 'ADMIN'] as Role[] },
     { id: 'reports', label: 'التقارير والإحصائيات', icon: BarChart3, roles: ['ADMIN', 'VICE_PRINCIPAL', 'TEACHER'] as Role[] },
+    { id: 'users', label: 'إدارة المعلمين', icon: ShieldAlert, roles: ['ADMIN'] as Role[] },
   ];
 
   const filteredMenu = menuItems.filter(item => item.roles.includes(user.role));
@@ -40,8 +43,8 @@ const Layout: React.FC<LayoutProps> = ({ user, onLogout, activeTab, setActiveTab
         <div className="p-6 flex items-center gap-3 border-b border-slate-800">
           <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-xl">م</div>
           <div>
-            <h1 className="font-bold text-lg leading-tight">مدرسة المستقبل</h1>
-            <span className="text-xs text-slate-400">نظام الإدارة المتكامل</span>
+            <h1 className="font-bold text-lg leading-tight text-right">مدرسة المستقبل</h1>
+            <span className="text-xs text-slate-400 block text-right">نظام الإدارة المتكامل</span>
           </div>
         </div>
 

@@ -10,6 +10,7 @@ import TeacherSchedule from './components/TeacherSchedule';
 import Attendance from './components/Attendance';
 import Assignments from './components/Assignments';
 import Reports from './components/Reports';
+import UsersManagement from './components/UsersManagement';
 import { Loader2 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -81,7 +82,7 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white gap-4">
         <Loader2 className="animate-spin text-blue-500" size={48} />
-        <p className="font-bold text-lg">جاري تحميل نظام مدرسة المستقبل...</p>
+        <p className="font-bold text-lg text-right">جاري تحميل نظام مدرسة المستقبل...</p>
       </div>
     );
   }
@@ -94,10 +95,11 @@ const App: React.FC = () => {
     switch (activeTab) {
       case 'dashboard': return <Dashboard />;
       case 'students': return <StudentsList />;
-      case 'schedule': return <TeacherSchedule />;
+      case 'schedule': return <TeacherSchedule userRole={user.role} />;
       case 'attendance': return <Attendance />;
       case 'assignments': return <Assignments />;
       case 'reports': return <Reports />;
+      case 'users': return <UsersManagement />;
       default: return <Dashboard />;
     }
   };

@@ -8,8 +8,6 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
-  LineChart,
-  Line,
   PieChart,
   Pie,
   Cell
@@ -60,33 +58,34 @@ const Dashboard: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm">
+        <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm min-h-[450px]">
           <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
             <ClipboardCheck size={20} className="text-blue-600" />
             إحصائيات الحضور الأسبوعية
           </h3>
-          <div className="h-80 w-full">
+          <div style={{ width: '100%', height: 300 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data}>
+              <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                <YAxis axisLine={false} tickLine={false} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
                 <Tooltip 
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                  cursor={{ fill: '#f8fafc' }}
+                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', textAlign: 'right' }}
                 />
-                <Bar dataKey="حضور" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={40} />
-                <Bar dataKey="غياب" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={40} />
+                <Bar dataKey="حضور" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={35} />
+                <Bar dataKey="غياب" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={35} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm">
+        <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm min-h-[450px]">
           <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
             <Users size={20} className="text-blue-600" />
             توزيع الطلاب حسب الصفوف
           </h3>
-          <div className="h-80 w-full flex items-center">
+          <div style={{ width: '100%', height: 300 }} className="flex flex-col md:flex-row items-center">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -102,14 +101,14 @@ const Dashboard: React.FC = () => {
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip contentStyle={{ borderRadius: '12px', textAlign: 'right' }} />
               </PieChart>
             </ResponsiveContainer>
-            <div className="space-y-4">
+            <div className="mt-4 md:mt-0 md:mr-4 space-y-3 shrink-0">
               {gradeData.map((grade, index) => (
                 <div key={grade.name} className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index] }}></div>
-                  <span className="text-sm text-slate-600">{grade.name}</span>
+                  <span className="text-sm text-slate-600 font-bold">{grade.name}</span>
                 </div>
               ))}
             </div>

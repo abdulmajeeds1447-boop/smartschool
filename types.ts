@@ -7,7 +7,11 @@ export interface User {
   email: string;
   role: Role;
   phone?: string;
-  nationalId?: string;
+  nationalId?: string; // السجل المدني
+  teacherNumber?: string;
+  specialization?: string;
+  assignedGrade?: string;
+  assignedSection?: string;
 }
 
 export interface Student {
@@ -17,6 +21,7 @@ export interface Student {
   section: string;
   phone: string;
   studentNumber: string;
+  student_number?: string; // للتوافق مع قاعدة البيانات
 }
 
 export interface Schedule {
@@ -26,8 +31,7 @@ export interface Schedule {
   period: number;
   grade: string;
   section: string;
-  startTime: string;
-  endTime: string;
+  subject: string;
 }
 
 export interface AttendanceRecord {
@@ -37,22 +41,4 @@ export interface AttendanceRecord {
   status: 'PRESENT' | 'ABSENT' | 'LATE';
   teacherId: string;
   period: number;
-}
-
-export interface Assignment {
-  id: string;
-  title: string;
-  description: string;
-  grade: string;
-  section: string;
-  dueDate: string;
-}
-
-export interface Submission {
-  id: string;
-  assignmentId: string;
-  studentId: string;
-  score: number;
-  feedback: string;
-  status: 'SUBMITTED' | 'GRADED' | 'MISSING';
 }
