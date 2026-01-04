@@ -30,39 +30,37 @@ const App: React.FC = () => {
         const session = sessionData?.session;
 
         if (session?.user) {
-          const { data: profile, error: profileError } = await supabase
+          // جلب البروفايل فوراً للتأكد من الدور
+          const { data: profile } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', session.user.id)
             .maybeSingle();
 
-          if (profileError && profileError.message !== 'Failed to fetch') {
-            console.error("Profile error:", profileError);
-          }
-
           const isOwner = session.user.email === ownerEmail;
-          const role = isOwner ? 'ADMIN' : ((profile?.role as Role) || 'TEACHER');
+          // الدور يحسب بناءً على القاعدة أو الافتراضي هو معلم
+          const userRole = isOwner ? 'ADMIN' : (profile?.role || 'TEACHER') as Role;
 
           setUser({
             id: session.user.id,
-            name: profile?.full_name || session.user.user_metadata?.full_name || (isOwner ? 'مدير النظام' : 'مستخدم'),
+            name: profile?.full_name || 'مستخدم',
             email: session.user.email || '',
-            role: role,
+            role: userRole,
             teacherNumber: profile?.teacher_number,
             assigned_grade: profile?.assigned_grade,
             assigned_section: profile?.assigned_section,
-            specialization: profile?.specialization
           });
 
-          if (role === 'TEACHER') {
+          // التوجيه التلقائي بناءً على الدور
+          if (userRole === 'TEACHER' && activeTab === 'dashboard') {
             setActiveTab('attendance');
+          } else if (userRole === 'ADMIN' && activeTab === 'attendance') {
+            setActiveTab('dashboard');
           }
         }
       } catch (err: any) {
-        console.error("Initialization error:", err);
-        if (err.message === 'Failed to fetch') {
-           setInitError('تعذر الاتصال بالخادم. يرجى التحقق من الإنترنت.');
-        }
+        console.error("Init Error:", err);
+        setInitError('مشكلة في الاتصال بالخادم');
       } finally {
         setInitializing(false);
       }
@@ -70,9 +68,12 @@ const App: React.FC = () => {
 
     checkUser();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!session) {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT' || !session) {
         setUser(null);
+        setActiveTab('dashboard');
+      } else if (event === 'SIGNED_IN' && session?.user) {
+        checkUser(); // إعادة الفحص عند الدخول
       }
     });
 
@@ -88,26 +89,7 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen bg-[#030712] flex flex-col items-center justify-center text-white gap-4" dir="rtl">
         <Loader2 className="animate-spin text-blue-500" size={64} />
-        <p className="font-black text-lg font-['Tajawal']">ثانوية الأمير عبدالمجيد الأولى</p>
-        <p className="text-slate-500 text-xs animate-pulse font-['Tajawal']">جاري استعادة جلسة العمل السحابية...</p>
-      </div>
-    );
-  }
-
-  if (initError && !user) {
-    return (
-      <div className="min-h-screen bg-[#030712] flex flex-col items-center justify-center p-6 text-center" dir="rtl">
-        <div className="bg-amber-50 border-2 border-amber-200 p-8 rounded-[2.5rem] max-w-md shadow-2xl">
-          <DatabaseZap size={48} className="text-amber-600 mx-auto mb-4 animate-bounce" />
-          <h2 className="text-xl font-black text-amber-900 mb-2 font-['Tajawal']">مشكلة في الاتصال</h2>
-          <p className="text-sm text-amber-800 font-bold mb-6 font-['Tajawal']">{initError}</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="w-full py-4 bg-amber-600 text-white rounded-2xl font-black font-['Tajawal'] shadow-lg active:scale-95 transition-all"
-          >
-            إعادة المحاولة الآن
-          </button>
-        </div>
+        <p className="font-black text-lg font-['Tajawal'] tracking-wider">ثانوية الأمير عبدالمجيد الأولى</p>
       </div>
     );
   }
@@ -115,7 +97,7 @@ const App: React.FC = () => {
   if (!user) {
     return <Login onLogin={(u) => {
       setUser(u);
-      if (u.role === 'TEACHER') setActiveTab('attendance');
+      setActiveTab(u.role === 'ADMIN' ? 'dashboard' : 'attendance');
     }} />;
   }
 
@@ -125,7 +107,6 @@ const App: React.FC = () => {
       case 'students': return <StudentsList user={user} />;
       case 'schedule': return <TeacherSchedule user={user} />;
       case 'attendance': return <Attendance user={user} />;
-      case 'assignments': return <Assignments user={user} onNavigate={setActiveTab} />;
       case 'reports': return <Reports user={user} />;
       case 'users': return <UsersManagement />;
       default: return <Dashboard user={user} onNavigate={setActiveTab} />;
@@ -133,12 +114,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <Layout 
-      user={user} 
-      onLogout={handleLogout} 
-      activeTab={activeTab} 
-      setActiveTab={setActiveTab}
-    >
+    <Layout user={user} onLogout={handleLogout} activeTab={activeTab} setActiveTab={setActiveTab}>
       {renderContent()}
     </Layout>
   );
