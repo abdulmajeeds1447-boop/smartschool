@@ -8,29 +8,23 @@ import Dashboard from './components/Dashboard';
 import StudentsList from './components/StudentsList';
 import TeacherSchedule from './components/TeacherSchedule';
 import Attendance from './components/Attendance';
-import Assignments from './components/Assignments';
 import Reports from './components/Reports';
 import UsersManagement from './components/UsersManagement';
-import { Loader2, DatabaseZap } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [initializing, setInitializing] = useState(true);
-  const [initError, setInitError] = useState<string | null>(null);
 
   const ownerEmail = "abdulmajeed.s1447@gmail.com";
 
   useEffect(() => {
     const checkUser = async () => {
       try {
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) throw sessionError;
-        const session = sessionData?.session;
+        const { data: { session } } = await supabase.auth.getSession();
 
         if (session?.user) {
-          // جلب البروفايل فوراً للتأكد من الدور
           const { data: profile } = await supabase
             .from('profiles')
             .select('*')
@@ -38,10 +32,9 @@ const App: React.FC = () => {
             .maybeSingle();
 
           const isOwner = session.user.email === ownerEmail;
-          // الدور يحسب بناءً على القاعدة أو الافتراضي هو معلم
           const userRole = isOwner ? 'ADMIN' : (profile?.role || 'TEACHER') as Role;
 
-          setUser({
+          const currentUser = {
             id: session.user.id,
             name: profile?.full_name || 'مستخدم',
             email: session.user.email || '',
@@ -49,18 +42,17 @@ const App: React.FC = () => {
             teacherNumber: profile?.teacher_number,
             assigned_grade: profile?.assigned_grade,
             assigned_section: profile?.assigned_section,
-          });
+          };
 
-          // التوجيه التلقائي بناءً على الدور
+          setUser(currentUser);
+          
+          // التوجيه الذكي فور تسجيل الدخول
           if (userRole === 'TEACHER' && activeTab === 'dashboard') {
             setActiveTab('attendance');
-          } else if (userRole === 'ADMIN' && activeTab === 'attendance') {
-            setActiveTab('dashboard');
           }
         }
-      } catch (err: any) {
+      } catch (err) {
         console.error("Init Error:", err);
-        setInitError('مشكلة في الاتصال بالخادم');
       } finally {
         setInitializing(false);
       }
@@ -72,8 +64,8 @@ const App: React.FC = () => {
       if (event === 'SIGNED_OUT' || !session) {
         setUser(null);
         setActiveTab('dashboard');
-      } else if (event === 'SIGNED_IN' && session?.user) {
-        checkUser(); // إعادة الفحص عند الدخول
+      } else if (event === 'SIGNED_IN') {
+        checkUser();
       }
     });
 
@@ -83,13 +75,15 @@ const App: React.FC = () => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setUser(null);
+    setActiveTab('dashboard');
   };
 
   if (initializing) {
     return (
-      <div className="min-h-screen bg-[#030712] flex flex-col items-center justify-center text-white gap-4" dir="rtl">
+      <div className="min-h-screen bg-[#0f172a] flex flex-col items-center justify-center text-white gap-4" dir="rtl">
         <Loader2 className="animate-spin text-blue-500" size={64} />
-        <p className="font-black text-lg font-['Tajawal'] tracking-wider">ثانوية الأمير عبدالمجيد الأولى</p>
+        <p className="font-black text-lg font-['Tajawal']">ثانوية الأمير عبدالمجيد الأولى</p>
+        <p className="text-slate-400 text-xs animate-pulse">جاري استعادة الجلسة السحابية...</p>
       </div>
     );
   }
