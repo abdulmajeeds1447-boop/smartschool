@@ -1,149 +1,47 @@
 
-import React, { useState } from 'react';
-import { Plus, BookOpen, Clock, Users, ChevronLeft, CheckCircle, AlertCircle, Star } from 'lucide-react';
+import React from 'react';
+import { User } from '../types';
+import { BookOpen, ArrowRight, ClipboardCheck, Sparkles } from 'lucide-react';
 
-const Assignments: React.FC = () => {
-  const [view, setView] = useState<'LIST' | 'DETAILS'>('LIST');
-  const [selectedTask, setSelectedTask] = useState<any>(null);
+interface AssignmentsProps {
+  user: User;
+  onNavigate: (tab: string) => void;
+}
 
-  const mockAssignments = [
-    { id: 1, title: 'بحث في علم الفيزياء - قوانين الحركة', grade: 'الأول الثانوي', section: 'أ', submissions: 24, total: 30, deadline: '2024-05-15', status: 'ACTIVE' },
-    { id: 2, title: 'حل واجب الرياضيات - الدوال واللوغاريتمات', grade: 'الثاني الثانوي', section: 'ب', submissions: 28, total: 32, deadline: '2024-05-12', status: 'EXPIRED' },
-    { id: 3, title: 'ملف أعمال - اللغة العربية (الشعر الأموي)', grade: 'الثالث الثانوي', section: 'ج', submissions: 15, total: 28, deadline: '2024-05-20', status: 'ACTIVE' },
-  ];
-
-  const handleTaskClick = (task: any) => {
-    setSelectedTask(task);
-    setView('DETAILS');
-  };
-
-  if (view === 'DETAILS') {
-    return (
-      <div className="space-y-6 animate-in slide-in-from-left-4 duration-300">
-        <button 
-          onClick={() => setView('LIST')}
-          className="flex items-center gap-2 text-slate-500 hover:text-blue-600 font-bold transition-colors"
-        >
-          <ChevronLeft className="rotate-180" size={20} />
-          العودة لقائمة التكليفات
-        </button>
-
-        <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
-          <div className="flex justify-between items-start mb-8">
-            <div>
-              <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-xs font-black mb-2 inline-block">{selectedTask.grade}</span>
-              <h2 className="text-2xl font-bold text-slate-800">{selectedTask.title}</h2>
-            </div>
-            <div className="text-right">
-              <div className="text-sm font-bold text-slate-400 mb-1">نسبة التسليم</div>
-              <div className="text-2xl font-black text-blue-600">%{Math.round((selectedTask.submissions / selectedTask.total) * 100)}</div>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="font-bold text-slate-700 flex items-center gap-2">
-              <Users size={18} />
-              قائمة الطلاب والتسليمات
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[1, 2, 3, 4].map(i => (
-                <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-blue-200 transition-all group">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-500">ط</div>
-                    <div>
-                      <div className="font-bold text-slate-800">طالب عينة {i}</div>
-                      <div className="text-[10px] text-slate-400">تم التسليم: 2024-05-10</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input 
-                      type="number" 
-                      placeholder="درجة" 
-                      className="w-16 px-2 py-1 bg-white border border-slate-200 rounded-lg text-center font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                    />
-                    <button className="p-2 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all">
-                      <CheckCircle size={20} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+const Assignments: React.FC<AssignmentsProps> = ({ user, onNavigate }) => {
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h3 className="text-2xl font-bold text-slate-800">التكليفات الأكاديمية</h3>
-          <p className="text-sm text-slate-500">إدارة البحوث والواجبات المنزلية وملفات الأعمال</p>
+    <div className="flex flex-col items-center justify-center py-12 lg:py-24 space-y-8 text-center font-['Tajawal'] px-4">
+      <div className="relative">
+        <div className="w-28 h-28 bg-indigo-50 text-indigo-600 rounded-[2.5rem] flex items-center justify-center shadow-inner animate-pulse">
+          <BookOpen size={56} />
         </div>
-        <button className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20">
-          <Plus size={18} />
-          إنشاء تكليف جديد
-        </button>
+        <div className="absolute -top-2 -right-2 w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg">
+          <Sparkles size={20} />
+        </div>
+      </div>
+      
+      <div className="space-y-4 max-w-md">
+        <h2 className="text-3xl font-black text-slate-800">سجل المتابعة المدمج</h2>
+        <p className="text-slate-500 font-bold leading-relaxed">
+          لتوفير الوقت، تم دمج سجلات المتابعة والواجبات مباشرة داخل واجهة "الحصص". يمكنك الآن رصد الحضور والواجب في شاشة واحدة!
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {mockAssignments.map((assignment) => (
-          <div 
-            key={assignment.id} 
-            onClick={() => handleTaskClick(assignment)}
-            className="bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group"
-          >
-            <div className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <div className={`p-3 rounded-2xl ${assignment.status === 'ACTIVE' ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>
-                  <BookOpen size={24} />
-                </div>
-                <div className="flex flex-col items-end">
-                  <span className="text-[10px] font-black px-2 py-1 bg-slate-100 text-slate-500 rounded-lg mb-1">
-                    {assignment.grade}
-                  </span>
-                  {assignment.status === 'EXPIRED' && (
-                    <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1">
-                      <AlertCircle size={10} /> منتهي
-                    </span>
-                  )}
-                </div>
-              </div>
-              
-              <h4 className="font-bold text-slate-800 text-lg mb-4 group-hover:text-blue-600 transition-colors leading-tight">
-                {assignment.title}
-              </h4>
-              
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="bg-slate-50 p-3 rounded-2xl">
-                  <div className="text-[10px] text-slate-400 font-bold mb-1">التسليمات</div>
-                  <div className="text-sm font-black text-slate-700">{assignment.submissions} / {assignment.total}</div>
-                </div>
-                <div className="bg-slate-50 p-3 rounded-2xl">
-                  <div className="text-[10px] text-slate-400 font-bold mb-1">الموعد النهائي</div>
-                  <div className="text-sm font-black text-slate-700">{assignment.deadline}</div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex -space-x-2 rtl:space-x-reverse">
-                  {[1, 2, 3].map(i => (
-                    <div key={i} className="w-8 h-8 rounded-full border-2 border-white bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-500">
-                      {i}
-                    </div>
-                  ))}
-                  <div className="w-8 h-8 rounded-full border-2 border-white bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-600">
-                    +{assignment.submissions - 3}
-                  </div>
-                </div>
-                <button className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-all">
-                  <ChevronLeft size={20} />
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
+      <div className="w-full max-w-sm space-y-4">
+        <button 
+          onClick={() => onNavigate('attendance')}
+          className="w-full bg-slate-900 text-white py-6 rounded-3xl font-black shadow-2xl flex items-center justify-center gap-4 hover:scale-[1.02] transition-all active:scale-95 group"
+        >
+          <ClipboardCheck size={24} className="group-hover:text-blue-400 transition-colors" />
+          ابدأ رصد المتابعة الآن
+          <ArrowRight size={20} className="rotate-180" />
+        </button>
+        
+        <div className="bg-amber-50 border border-amber-100 p-5 rounded-3xl text-right">
+          <p className="text-[11px] font-black text-amber-800 leading-tight">
+            * نصيحة: عند فتح أي حصة من تبويب "الحصص"، ستجد ثلاثة أزرار في الأعلى للتنقل بين (الحضور، المتابعة، الملاحظات).
+          </p>
+        </div>
       </div>
     </div>
   );

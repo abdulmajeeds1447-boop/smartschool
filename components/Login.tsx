@@ -2,172 +2,267 @@
 import React, { useState } from 'react';
 import { User, Role } from '../types';
 import { supabase } from '../services/supabaseClient';
-import { Lock, Fingerprint, ShieldCheck, GraduationCap, Loader2, Info, Mail } from 'lucide-react';
+import { Lock, Fingerprint, ShieldCheck, GraduationCap, Loader2, AlertCircle, Sparkles, CheckCircle2, UserX, Settings, MailWarning, WifiOff, Globe, DatabaseZap } from 'lucide-react';
 
 interface LoginProps {
   onLogin: (user: User) => void;
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
-  const [identifier, setIdentifier] = useState(''); // يمكن أن يكون سجل مدني أو بريد
+  const [identifier, setIdentifier] = useState(''); 
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{msg: string, type: 'error' | 'info' | 'success' | 'admin_alert' | 'network_error'} | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    const isEmail = identifier.includes('@');
-    const adminEmail = "abdulmajeed.s1447@gmail.com";
+    const input = identifier.trim();
+    if (!input) {
+      setError({ msg: 'يرجى إدخال رقم السجل المدني أو البريد', type: 'error' });
+      setLoading(false);
+      return;
+    }
+
+    const ownerEmail = "abdulmajeed.s1447@gmail.com";
+    const isEmail = input.includes('@');
+    const isSystemAdmin = input.toLowerCase() === 'admin' || input.toLowerCase() === ownerEmail || (isEmail && input.toLowerCase() === ownerEmail);
 
     try {
-      let emailToAuth = identifier.trim();
-      let displayName = '';
-      let userRole: Role = 'TEACHER';
+      let targetEmail = isSystemAdmin ? ownerEmail : `${input}@school.com`;
+      let targetPassword = password || input;
 
-      if (isEmail) {
-        // --- مسار دخول الإدارة (بالبريد) ---
-        emailToAuth = identifier.toLowerCase().trim();
-        
-        // جلب بيانات البروفايل للتأكد من الاسم والرتبة
-        const { data: profile } = await supabase
+      // 1. التحقق من القائمة البيضاء (profiles)
+      if (!isSystemAdmin && !isEmail) {
+        const { data: profileExists, error: profileError } = await supabase
           .from('profiles')
-          .select('full_name, role')
-          .eq('email', emailToAuth)
-          .maybeSingle();
-        
-        displayName = profile?.full_name || (emailToAuth === adminEmail ? 'مدير النظام' : 'مستخدم');
-        userRole = (profile?.role as Role) || (emailToAuth === adminEmail ? 'ADMIN' : 'TEACHER');
-      } else {
-        // --- مسار دخول المعلمين (بالسجل المدني) ---
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('email, role, full_name, id')
-          .eq('teacher_number', identifier.trim())
+          .select('id, full_name')
+          .eq('teacher_number', input)
           .maybeSingle();
 
         if (profileError) throw profileError;
-        
-        if (!profile) {
-          throw new Error('السجل المدني غير مسجل في النظام. يرجى مراجعة الإدارة.');
+
+        if (!profileExists) {
+          setError({ 
+            msg: 'هذا السجل المدني غير مسجل في قائمة المعلمين المعتمدين. يرجى مراجعة إدارة المدرسة للتأكد من إضافتك.', 
+            type: 'error' 
+          });
+          setLoading(false);
+          return;
         }
-
-        emailToAuth = profile.email;
-        displayName = profile.full_name;
-        userRole = profile.role as Role;
       }
 
-      // إتمام عملية تسجيل الدخول عبر Supabase Auth
-      // للمدير: يجب إدخال كلمة المرور. للمعلم: السجل المدني هو كلمة المرور الافتراضية إذا لم تحدد
-      const finalPassword = password || (isEmail ? '' : identifier.trim());
-      
-      if (isEmail && !password) {
-        throw new Error('يرجى إدخال كلمة المرور الخاصة بحساب الإدارة.');
-      }
-
-      const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: emailToAuth,
-        password: finalPassword
+      // 2. محاولة تسجيل الدخول
+      let { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: targetEmail,
+        password: targetPassword
       });
 
       if (signInError) {
-        if (signInError.message.includes('Invalid login credentials')) {
-          throw new Error(isEmail ? 'كلمة مرور الإدارة غير صحيحة.' : 'كلمة المرور غير صحيحة لهذا السجل المدني.');
+        if (signInError.message.includes("Email not confirmed")) {
+          setError({ 
+            msg: 'تنبيه للمدير: البريد غير مؤكد. يرجى تعطيل خيار "Confirm Email" من إعدادات Supabase Authentication.', 
+            type: 'admin_alert' 
+          });
+          setLoading(false);
+          return;
         }
-        throw signInError;
+        
+        if (signInError.message.includes("Invalid login credentials") && !isSystemAdmin && !isEmail) {
+          setError({ msg: 'جاري تهيئة حسابك الجديد للمرة الأولى، فضلاً انتظر...', type: 'info' });
+          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+            email: targetEmail,
+            password: targetPassword,
+          });
+
+          if (signUpError) throw signUpError;
+          authData = { user: signUpData.user, session: signUpData.session };
+        } else {
+          throw signInError;
+        }
       }
 
-      if (authData.user) {
+      if (authData?.user) {
+        const userId = authData.user.id;
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .or(`teacher_number.eq.${input},id.eq.${userId}`)
+          .maybeSingle();
+
+        const role = isSystemAdmin ? 'ADMIN' : (profile?.role || 'TEACHER');
+        
+        const { data: finalProfile, error: upsertError } = await supabase
+          .from('profiles')
+          .upsert({
+            id: userId,
+            teacher_number: isSystemAdmin ? null : input,
+            full_name: profile?.full_name || (isSystemAdmin ? 'المدير' : 'معلم'),
+            email: targetEmail,
+            role: role,
+            assigned_grade: profile?.assigned_grade,
+            assigned_section: profile?.assigned_section
+          })
+          .select()
+          .single();
+
+        if (upsertError) throw upsertError;
+
         onLogin({
-          id: authData.user.id,
-          name: displayName,
-          email: authData.user.email || '',
-          role: userRole,
-          teacherNumber: isEmail ? undefined : identifier
+          id: userId,
+          name: finalProfile.full_name,
+          email: targetEmail,
+          role: finalProfile.role as Role,
+          teacherNumber: input,
+          assigned_grade: finalProfile.assigned_grade,
+          assigned_section: finalProfile.assigned_section
         });
       }
+
     } catch (err: any) {
-      setError(err.message || 'حدث خطأ غير متوقع');
+      console.error("Login Diagnostic Error:", err);
+      
+      // التعامل الذكي مع خطأ Failed to fetch
+      if (err.message === 'Failed to fetch' || err.code === 'PGRST301' || err.status === 0) {
+        setError({ 
+          msg: 'تعذر الاتصال بقاعدة البيانات (Failed to fetch). قد يكون مشروع Supabase متوقف مؤقتاً أو هناك مشكلة في اتصال الإنترنت لديك.', 
+          type: 'network_error' 
+        });
+      } else {
+        setError({ 
+          msg: 'حدث خطأ أثناء تسجيل الدخول: ' + (err.message || 'يرجى مراجعة البيانات'), 
+          type: 'error' 
+        });
+      }
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0f172a] p-4 font-['Tajawal']">
-      <div className="w-full max-w-md">
-        <div className="bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-500">
-          {/* Header */}
-          <div className="bg-gradient-to-br from-indigo-600 to-blue-700 p-10 text-center text-white relative">
-            <div className="absolute top-4 right-4 opacity-10">
-              <ShieldCheck size={80} />
+    <div className="min-h-screen flex items-center justify-center bg-[#030712] p-4 font-['Tajawal'] text-right" dir="rtl">
+      <div className="w-full max-w-md animate-in fade-in zoom-in duration-700">
+        
+        {/* تنبيه خطأ الشبكة المطور */}
+        {error?.type === 'network_error' && (
+          <div className="mb-6 bg-amber-50 border-2 border-amber-200 p-6 rounded-[2.5rem] shadow-xl animate-in slide-in-from-top">
+            <div className="flex items-center gap-3 text-amber-700 mb-3">
+              <DatabaseZap className="animate-bounce" size={24} />
+              <h3 className="font-black text-sm">خطأ في الاتصال بالخادم</h3>
             </div>
-            <div className="w-20 h-20 bg-white/20 rounded-3xl mx-auto flex items-center justify-center mb-6 backdrop-blur-md border border-white/30">
-              <GraduationCap size={44} className="text-white" />
+            <div className="space-y-3">
+               <p className="text-[10px] text-amber-900 font-bold leading-relaxed">
+                تطبيقك يحاول الوصول لقاعدة البيانات ولكنها لا تستجيب. يرجى التأكد مما يلي:
+              </p>
+              <ul className="text-[9px] text-amber-800 space-y-1 font-bold list-disc pr-4">
+                <li>اتصال الإنترنت الخاص بك نشط ومستقر.</li>
+                <li>مشروع Supabase غير متوقف (Paused) في لوحة التحكم.</li>
+                <li>رابط قاعدة البيانات غير محظور بواسطة برامج الحماية أو جدار الحماية.</li>
+              </ul>
+              <button 
+                onClick={() => window.location.reload()} 
+                className="w-full py-2.5 bg-amber-600 text-white rounded-xl font-black text-[10px] shadow-lg shadow-amber-600/20 active:scale-95 transition-all"
+              >
+                تحديث الصفحة وإعادة المحاولة
+              </button>
             </div>
-            <h1 className="text-2xl font-black tracking-tight">نظام مدرسة المستقبل</h1>
-            <p className="text-indigo-100 mt-2 text-sm font-medium opacity-90">بوابة الدخول الموحدة (إدارة / معلمين)</p>
+          </div>
+        )}
+
+        {error?.type === 'admin_alert' && (
+          <div className="mb-6 bg-rose-50 border-2 border-rose-200 p-6 rounded-[2.5rem] shadow-xl animate-in slide-in-from-top">
+            <div className="flex items-center gap-3 text-rose-700 mb-3">
+              <MailWarning className="animate-pulse" size={24} />
+              <h3 className="font-black text-sm">تنبيه تأكيد البريد</h3>
+            </div>
+            <p className="text-[10px] text-rose-800 font-bold leading-relaxed">
+              عذراً، نظام الحماية يرفض الدخول لأن خيار "تأكيد البريد" مفعل في الإعدادات. 
+              <br/><br/>
+              <span className="text-rose-600 underline">الحل للمدير:</span>
+              <br/>
+              1. توجه لـ Supabase -> Authentication -> Providers.
+              <br/>
+              2. قم بتعطيل (Confirm Email).
+              <br/>
+              3. احذف الحساب القديم من Auth وجرب الدخول مرة أخرى.
+            </p>
+            <button onClick={() => setError(null)} className="mt-4 w-full py-2 bg-rose-200 text-rose-800 rounded-xl font-black text-[10px]">فهمت ذلك</button>
+          </div>
+        )}
+
+        <div className="bg-white rounded-[3.5rem] shadow-2xl overflow-hidden border border-slate-100 relative">
+          <div className="bg-gradient-to-br from-blue-700 via-blue-600 to-indigo-900 p-12 text-center text-white relative">
+            <div className="absolute top-0 right-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
+            <div className="relative z-10">
+              <div className="w-24 h-24 bg-white/20 rounded-[2rem] mx-auto flex items-center justify-center mb-6 backdrop-blur-xl border border-white/30 shadow-inner group transition-all duration-700 hover:rotate-[360deg]">
+                <GraduationCap size={48} className="text-white" />
+              </div>
+              <h1 className="text-2xl font-black">ثانوية الأمير عبدالمجيد الأولى</h1>
+              <p className="text-blue-200 mt-2 text-[10px] font-bold uppercase tracking-widest opacity-80">بوابة المزامنة الموحدة - الإصدار الرابع</p>
+            </div>
           </div>
           
-          <form onSubmit={handleSubmit} className="p-8 space-y-5">
-            {error && (
-              <div className="p-4 bg-rose-50 border border-rose-100 text-rose-600 text-xs rounded-2xl font-bold flex items-start gap-3 animate-pulse">
-                <Info size={16} className="shrink-0 mt-0.5" />
-                <span>{error}</span>
+          <form onSubmit={handleSubmit} className="p-10 space-y-6">
+            {error && error.type !== 'admin_alert' && error.type !== 'network_error' && (
+              <div className={`p-4 rounded-2xl flex items-start gap-3 animate-in slide-in-from-top-2 border ${
+                error.type === 'error' ? 'bg-rose-50 text-rose-600 border-rose-100' : 
+                'bg-blue-50 text-blue-600 border-blue-100'
+              }`}>
+                <div className="mt-0.5">
+                  {error.type === 'error' ? <AlertCircle size={18} /> : <Loader2 size={18} className="animate-spin" />}
+                </div>
+                <p className="text-[11px] font-black leading-tight">{error.msg}</p>
               </div>
             )}
 
             <div className="space-y-4">
-              <div className="relative group">
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors">
-                  {identifier.includes('@') ? <Mail size={20} /> : <Fingerprint size={20} />}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 px-4 uppercase tracking-widest">اسم المستخدم (السجل المدني)</label>
+                <div className="relative">
+                  <Fingerprint className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={20} />
+                  <input
+                    type="text"
+                    placeholder="رقم السجل المدني الخاص بك"
+                    className="w-full pr-12 pl-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 transition-all text-right font-black outline-none"
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    required
+                  />
                 </div>
-                <input
-                  type="text"
-                  placeholder="السجل المدني أو البريد الإلكتروني"
-                  className="w-full pr-12 pl-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:bg-white transition-all text-right font-bold text-slate-700"
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
-                  required
-                />
               </div>
-              
-              <div className="relative group">
-                <Lock className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" size={20} />
-                <input
-                  type="password"
-                  placeholder="كلمة المرور"
-                  className="w-full pr-12 pl-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:bg-white transition-all text-right font-bold text-slate-700"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 px-4 uppercase tracking-widest">كلمة المرور</label>
+                <div className="relative">
+                  <Lock className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={20} />
+                  <input
+                    type="password"
+                    placeholder="السجل المدني (لأول مرة)"
+                    className="w-full pr-12 pl-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 transition-all text-right font-black outline-none"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
               </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-lg hover:bg-indigo-700 active:scale-[0.98] transition-all shadow-xl shadow-indigo-500/30 flex items-center justify-center gap-3 disabled:opacity-50"
+            <button 
+              type="submit" 
+              disabled={loading} 
+              className="group w-full py-5 bg-blue-600 text-white rounded-[1.8rem] font-black text-lg shadow-xl shadow-blue-500/30 flex items-center justify-center gap-3 hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-50"
             >
-              {loading ? <Loader2 className="animate-spin" size={24} /> : <ShieldCheck size={24} />}
-              {identifier.includes('@') ? 'دخول الإدارة' : 'دخول المعلمين'}
+              {loading ? <Loader2 className="animate-spin" size={24} /> : <ShieldCheck size={24} />} 
+              {loading ? 'جاري الاتصال بالسحابة...' : 'دخول النظام الموحد'}
             </button>
-
-            <div className="pt-6 text-center border-t border-slate-50">
-              <div className="flex justify-center gap-4 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                <span className="flex items-center gap-1"><ShieldCheck size={12} className="text-emerald-500" /> مشفر</span>
-                <span className="flex items-center gap-1"><ShieldCheck size={12} className="text-emerald-500" /> آمن</span>
-                <span className="flex items-center gap-1"><ShieldCheck size={12} className="text-emerald-500" /> سحابي</span>
-              </div>
+            
+            <div className="flex items-center gap-2 text-[9px] text-slate-400 font-bold justify-center pt-4 border-t border-slate-50">
+              <Sparkles size={12} className="text-blue-500" />
+              <span>متاح فقط للكادر التعليمي المعتمد لعام 1447هـ</span>
             </div>
           </form>
         </div>
-        
-        <p className="text-center mt-8 text-slate-500 text-xs font-medium">
-          الدعم الفني: abdulmajeed.s1447@gmail.com
-        </p>
       </div>
     </div>
   );

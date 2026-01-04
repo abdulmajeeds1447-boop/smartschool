@@ -1,28 +1,24 @@
 
 import { GoogleGenAI } from "@google/genai";
 
-// AI helper for generating student reports using the Gemini 3 Flash model
-export const generateStudentReport = async (studentName: string, attendanceData: any, performanceData: any) => {
+export const generateStudentReport = async (studentName: string, grade: string, section: string) => {
   try {
-    // Correctly initialize Gemini API using process.env.API_KEY directly as per guidelines
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-    // Use gemini-3-flash-preview for basic text generation tasks
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `
-        اكتب تقريراً قصيراً ومحفزاً لولي أمر الطالب ${studentName} بناءً على البيانات التالية باللغة العربية:
-        - نسبة الحضور: ${attendanceData}%
-        - متوسط الدرجات: ${performanceData}%
-        اجعل التقرير مناسباً للإرسال عبر واتساب وبأسلوب مهذب وداعم.
+        أنت مستشار طلابي محترف في ثانوية الأمير عبدالمجيد. 
+        اكتب رسالة واتساب لولي أمر الطالب (اسم الطالب: ${studentName}) في (الصف: ${grade} - فصل: ${section}).
+        الرسالة يجب أن تبدأ بتحية إسلامية، وتكون بلهجة سعودية بيضاء، مهذبة، وتحث على التعاون بين البيت والمدرسة لمصلحة الطالب.
+        تجنب التفاصيل التقنية المعقدة واجعلها رسالة تشعر ولي الأمر بالاهتمام والتقدير.
+        لا تضف أي رموز برمجية، فقط نص الرسالة جاهز للإرسال.
       `,
     });
 
-    // Access response.text directly (property, not a method)
-    return response.text || "لم يتمكن الذكاء الاصطناعي من توليد نص حالياً.";
+    return response.text || "السلام عليكم، نود إحاطتكم بتميز ابننا في المدرسة وضرورة استمرار المتابعة.";
   } catch (error: any) {
     console.error("Gemini Service Error:", error);
-    // Return a generic user-friendly message without exposing technical details about API keys
-    return "عذراً، حدثت مشكلة أثناء محاولة إنشاء التقرير الذكي.";
+    return "السلام عليكم، نود إحاطتكم بضرورة متابعة أداء ابننا الدراسي لضمان تفوقه الدائم. شكراً لتعاونكم.";
   }
 };

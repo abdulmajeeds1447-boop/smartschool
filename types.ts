@@ -7,11 +7,10 @@ export interface User {
   email: string;
   role: Role;
   phone?: string;
-  nationalId?: string; // السجل المدني
   teacherNumber?: string;
   specialization?: string;
-  assignedGrade?: string;
-  assignedSection?: string;
+  assigned_grade?: string;    // متوافق مع قاعدة البيانات
+  assigned_section?: string;  // متوافق مع قاعدة البيانات (نص مفصول بفاصلة)
 }
 
 export interface Student {
@@ -21,7 +20,7 @@ export interface Student {
   section: string;
   phone: string;
   studentNumber: string;
-  student_number?: string; // للتوافق مع قاعدة البيانات
+  student_number?: string;
 }
 
 export interface Schedule {
